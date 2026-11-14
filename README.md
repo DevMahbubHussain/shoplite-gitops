@@ -70,7 +70,51 @@ ArgoCD manages itself and child environments through a root meta-application:
 
 ---
 
-## 3. Repository Directory Structure
+## 3. How CI/CD & GitOps Work Together in ShopLite
+
+The deployment lifecycle operates across an automated, closed-loop handshake between GitHub Actions (CI) in `shoplite-app` and ArgoCD (CD) in `shoplite-gitops`:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Dev as Developer
+    participant AppRepo as shoplite-app (Repo 1)
+    participant GHA as GitHub Actions (CI)
+    participant ECR as AWS Amazon ECR
+    participant GitOpsRepo as shoplite-gitops (Repo 2)
+    participant ArgoCD as ArgoCD (In-Cluster)
+    participant K8s as Kubernetes Cluster (shoplite-dev)
+
+    Dev->>AppRepo: git push origin main (code edit in services/)
+    AppRepo->>GHA: Trigger .github/workflows/ci.yaml
+    Note over GHA: 1. Run Unit Tests (pytest)<br/>2. Lint Helm Chart (helm lint)<br/>3. Multi-Stage Build (<150MB)<br/>4. Scan Image with Trivy (CVE Gate)
+    GHA->>ECR: 5. Auth via AWS OIDC & Push Images (tag: sha-abc123)
+    GHA->>GitOpsRepo: 6. Update image tag in envs/dev/values.yaml & git commit
+    Note over GHA: CI Pipeline Ends (Zero kubectl apply)
+    
+    GitOpsRepo-->>ArgoCD: 7. Webhook / poll detects new commit on main
+    ArgoCD->>K8s: 8. Pulls new image from ECR & applies rolling update
+    ArgoCD-->>Dev: 9. Sync Status: Synced & Healthy (Live in shoplite-dev)
+```
+
+### 3.1 Triggering the CI/CD Pipeline
+The workflow is triggered via 3 distinct mechanisms in `shoplite-app`:
+1. **Automatic on Push:** Pushing commits to `main` with changes under `services/**`, `helm/**`, or `.github/workflows/**`.
+2. **Automatic on Pull Request:** Opening or updating a PR against `main` (executes tests, linting, and Trivy security scanning to gate merge approval).
+3. **Manual Trigger (`workflow_dispatch`):** Triggered manually on-demand from the GitHub web UI (`Actions` tab $\to$ `ShopLite CI/CD Pipeline` $\to$ `Run workflow`).
+
+### 3.2 The Step-by-Step CI $\to$ GitOps Handshake
+1. **Step 1: Test & Lint Gate:** Executes unit test suites (`pytest`) and validates Helm templates (`helm lint`).
+2. **Step 2: Security & Vulnerability Gate:** Builds lightweight multi-stage Docker images ($< 150\text{MB}$) running as non-root UID `10001` and scans them with Aqua Security **Trivy**. The build fails immediately if `CRITICAL` CVE vulnerabilities are found.
+3. **Step 3: Passwordless AWS OIDC Authentication:** Assumes an AWS IAM Role via OpenID Connect (OIDC) web identity tokens. Zero long-lived AWS Access Keys are stored in GitHub Secrets.
+4. **Step 4: Amazon ECR Publishing:** Publishes container images tagged with the exact Git commit SHA (`sha-${{ github.sha }}`) to Amazon ECR.
+5. **Step 5: Automated GitOps Tag Commit:** The CI runner checks out `shoplite-gitops`, patches `tag: "sha-${{ github.sha }}"` inside `envs/dev/values.yaml`, and pushes a conventional commit (`chore(gitops): promote catalog-api to sha-...`).
+6. **Step 6: Autonomous Cluster Reconciliation:** ArgoCD in the cluster detects the commit, compares live pods with the target state, and performs a zero-downtime rolling update.
+7. **Step 7: Production Promotion:** Promoting to `shoplite` production is executed via a clean Pull Request merging the validated image tag into `envs/prod/values.yaml`, followed by operator sync approval.
+
+---
+
+## 4. Repository Directory Structure
 
 ```text
 shoplite-gitops/
@@ -101,7 +145,7 @@ shoplite-gitops/
 
 ---
 
-## 4. Environment Comparison Matrix
+## 5. Environment Comparison Matrix
 
 | Configuration Attribute | Development (`envs/dev/`) | Production (`envs/prod/`) |
 | :--- | :--- | :--- |
@@ -117,9 +161,9 @@ shoplite-gitops/
 
 ---
 
-## 5. Step-by-Step Operator Guide
+## 6. Step-by-Step Operator Guide
 
-### 5.1 Bootstrapping ArgoCD in Kubernetes
+### 6.1 Bootstrapping ArgoCD in Kubernetes
 Deploy the official ArgoCD engine and register the root App-of-Apps:
 ```bash
 # 1. Run bootstrap script
@@ -133,7 +177,7 @@ kubectl port-forward svc/argocd-server -n argocd 8080:443
 # Login at https://localhost:8080 (user: admin)
 ```
 
-### 5.2 Promoting a Release from Dev to Prod
+### 6.2 Promoting a Release from Dev to Prod
 1. After automated CI verification in `shoplite-dev`, note the validated commit SHA or SemVer release tag.
 2. Open a Pull Request on `shoplite-gitops` updating `envs/prod/values.yaml`:
    ```yaml
@@ -149,7 +193,7 @@ kubectl port-forward svc/argocd-server -n argocd 8080:443
    ```
 3. Upon PR approval and merge to `main`, navigate to the ArgoCD UI and click **Sync** on `shoplite-prod` (or execute via CLI: `argocd app sync shoplite-prod`).
 
-### 5.3 Executing the Automated Self-Healing Drill
+### 6.3 Executing the Automated Self-Healing Drill
 Run the automated verification script to demonstrate cluster resilience:
 ```bash
 bash scripts/verify-self-healing.sh shoplite-catalog-api
@@ -158,7 +202,7 @@ bash scripts/verify-self-healing.sh shoplite-catalog-api
 - ArgoCD detects divergence (`OutOfSync`) and automatically restores replicas to `1` within seconds.
 - Zero manual changes can permanently alter the cluster state.
 
-### 5.4 Running the Question 8 Chaos Drill & Recovery
+### 6.4 Running the Question 8 Chaos Drill & Recovery
 1. **Inject Fault:** A peer copies one overlay from `chaos/overlays/` into `envs/prod/values.yaml` and commits to `main`.
 2. **Execute Load Test:** Run `k6 run --vus 25 --duration 15m loadtest.js` against the cluster.
 3. **Diagnose via Observability (Constraint C14):**
@@ -175,7 +219,7 @@ bash scripts/verify-self-healing.sh shoplite-catalog-api
 
 ---
 
-## 6. Security, Secrets & Compliance
+## 7. Security, Secrets & Compliance
 
 - **Zero Secrets in Git (Constraint C5):** Database passwords and API keys are NEVER stored in this repository. Sensitive values are injected via Kubernetes Secrets or synced via AWS Secrets Manager.
 - **Least-Privilege RBAC:** ArgoCD service accounts operate under strictly scoped Kubernetes ClusterRoles. External CI runners have zero cluster credentials.
