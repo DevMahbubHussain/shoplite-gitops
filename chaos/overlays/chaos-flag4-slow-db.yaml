@@ -1,0 +1,8 @@
+# Chaos Flag 4: Database Slow Query / Worker Bottleneck Simulation
+# Target Service: order-worker / PostgreSQL
+# Impact: Worker pauses 2000ms via pg_sleep before committing order status update
+# Observability Evidence: Golden Signals Panel 5 (order_queue_depth spikes), QueueBacklog alert fires
+orderWorker:
+  chaos:
+    chaosSlowDbMs: 2000
+    chaosMemoryLeakMb: 0
