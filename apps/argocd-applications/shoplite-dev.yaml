@@ -1,0 +1,45 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: shoplite-dev
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: shoplite
+    app.kubernetes.io/part-of: shoplite
+    environment: dev
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  # ArgoCD Multi-Source Pattern: Helm Chart from shoplite-app + Overrides from shoplite-gitops
+  sources:
+    - repoURL: https://github.com/DevMahbubHussain/shoplite-app.git
+      targetRevision: main
+      path: helm/shoplite
+      helm:
+        valueFiles:
+          - $values/envs/dev/values.yaml
+
+    - repoURL: https://github.com/DevMahbubHussain/shoplite-gitops.git
+      targetRevision: main
+      ref: values
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: shoplite-dev
+
+  # Automated Synchronization with Self-Healing (Constraint C2 & Roadmap Phase 3B)
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+      - PruneLast=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
