@@ -1,0 +1,8 @@
+# Chaos Flag 1: High Latency Simulation
+# Target Service: catalog-api
+# Impact: Introduces 1500ms artificial delay to ~30% of product catalog queries
+# Observability Evidence: Golden Signals Panel 2 (p95 spikes > 1.5s), Tempo span delay
+catalogApi:
+  chaos:
+    chaosLatencyMs: 1500
+    chaosErrorRate: 0.0
