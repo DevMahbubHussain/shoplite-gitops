@@ -1,0 +1,10 @@
+﻿# Environment & IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Learning Documentation
+learning/
