@@ -1,0 +1,8 @@
+# Chaos Flag 2: High Error Rate Simulation
+# Target Service: catalog-api
+# Impact: 20% of POST /orders fail immediately with HTTP 500
+# Observability Evidence: HighErrorRate alert fires, Golden Signals Panel 3 spikes to 20%, Loki error logs
+catalogApi:
+  chaos:
+    chaosLatencyMs: 0
+    chaosErrorRate: 0.2

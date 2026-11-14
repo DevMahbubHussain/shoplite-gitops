@@ -1,0 +1,8 @@
+# Chaos Flag 3: Worker Memory Leak Simulation
+# Target Service: order-worker
+# Impact: Allocates 2MB unreleased memory buffer per processed order, leading to OOMKilled (Exit Code 137)
+# Observability Evidence: Golden Signals Panel 4 memory climbs linearly, PodCrashLooping alert fires
+orderWorker:
+  chaos:
+    chaosSlowDbMs: 0
+    chaosMemoryLeakMb: 2
