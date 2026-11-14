@@ -1,0 +1,98 @@
+# ShopLite GitOps - Development Environment Values
+# Reconciled automatically by ArgoCD Application `shoplite-dev`
+# Target Namespace: shoplite-dev
+
+global:
+  environment: dev
+  project: shoplite
+
+catalogApi:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: 263303066497.dkr.ecr.ap-southeast-1.amazonaws.com/shoplite-catalog-api
+    tag: "dev-latest"
+    pullPolicy: Always
+  resources:
+    limits:
+      cpu: 250m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+  chaos:
+    chaosLatencyMs: 0
+    chaosErrorRate: 0.0
+
+orderWorker:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: 263303066497.dkr.ecr.ap-southeast-1.amazonaws.com/shoplite-order-worker
+    tag: "dev-latest"
+    pullPolicy: Always
+  resources:
+    limits:
+      cpu: 250m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+  chaos:
+    chaosSlowDbMs: 0
+    chaosMemoryLeakMb: 0
+
+web:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: 263303066497.dkr.ecr.ap-southeast-1.amazonaws.com/shoplite-web
+    tag: "dev-latest"
+    pullPolicy: Always
+  resources:
+    limits:
+      cpu: 100m
+      memory: 64Mi
+    requests:
+      cpu: 25m
+      memory: 32Mi
+
+postgresql:
+  enabled: true
+  persistence:
+    enabled: true
+    size: 2Gi
+  resources:
+    limits:
+      cpu: 250m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 128Mi
+
+redis:
+  enabled: true
+  resources:
+    limits:
+      cpu: 150m
+      memory: 128Mi
+    requests:
+      cpu: 25m
+      memory: 64Mi
+
+monitoring:
+  serviceMonitor:
+    enabled: true
+    interval: 15s
+    scrapeTimeout: 10s
+    labels:
+      release: prometheus
+
+autoscaling:
+  enabled: false
+
+podDisruptionBudget:
+  enabled: false
+
+networkPolicy:
+  enabled: true
