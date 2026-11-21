@@ -22,7 +22,7 @@ catalogApi:
       memory: 64Mi
   chaos:
     chaosLatencyMs: 0
-    chaosErrorRate: 0.25
+    chaosErrorRate: 0.0
 
 orderWorker:
   enabled: true
