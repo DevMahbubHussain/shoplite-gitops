@@ -96,3 +96,19 @@ podDisruptionBudget:
 
 networkPolicy:
   enabled: true
+
+# Environment-specific Ingress Host (avoids catch-all host collision between environments)
+ingress:
+  hosts:
+    - host: shoplite-dev.local
+      paths:
+        - path: /api(/|$)(.*)
+          pathType: ImplementationSpecific
+          service:
+            name: catalog-api
+            port: 8000
+        - path: /()(.*)
+          pathType: ImplementationSpecific
+          service:
+            name: web
+            port: 80
